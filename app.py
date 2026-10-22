@@ -4,7 +4,7 @@ import os
 import re
 import secrets
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import Callable
@@ -30,6 +30,15 @@ BASE_DIR = Path(__file__).resolve().parent
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 ISSUE_CATEGORIES = {"electrical", "plumbing", "furniture", "network", "cleaning", "other"}
 ISSUE_STATUSES = {"open", "in_progress", "resolved"}
+BOOKING_STATUSES = ("pending", "approved", "rejected", "cancelled")
+ANALYTICS_ISSUE_CATEGORIES = (
+    "electrical",
+    "plumbing",
+    "furniture",
+    "network",
+    "cleaning",
+    "other",
+)
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -227,6 +236,72 @@ def create_app(test_config: dict | None = None) -> Flask:
             "resource_type": resource_type,
             "search_error": search_error,
             "today": datetime.now().astimezone().date().isoformat(),
+        }
+
+    def admin_analytics(selected_date: str) -> dict:
+        if selected_date:
+            try:
+                parsed_date = date.fromisoformat(selected_date)
+            except ValueError:
+                abort(400, description="Choose a valid analytics date.")
+            if len(selected_date) != 10 or parsed_date.isoformat() != selected_date:
+                abort(400, description="Choose a valid analytics date.")
+
+        booking_counts = dict.fromkeys(BOOKING_STATUSES, 0)
+        issue_status_counts = dict.fromkeys(ISSUE_STATUSES, 0)
+        issue_category_counts = dict.fromkeys(ANALYTICS_ISSUE_CATEGORIES, 0)
+        booking_filter = " WHERE booking_date = ?" if selected_date else ""
+        issue_filter = (
+            " WHERE substr(created_at, 1, 10) = ?" if selected_date else ""
+        )
+        parameters = (selected_date,) if selected_date else ()
+
+        with get_connection(app.config["DATABASE"]) as connection:
+            for row in connection.execute(
+                "SELECT status, COUNT(*) AS count "
+                f"FROM bookings{booking_filter} GROUP BY status",
+                parameters,
+            ):
+                booking_counts[row["status"]] = row["count"]
+
+            for row in connection.execute(
+                "SELECT status, COUNT(*) AS count "
+                f"FROM facility_issues{issue_filter} GROUP BY status",
+                parameters,
+            ):
+                issue_status_counts[row["status"]] = row["count"]
+
+            top_facilities = connection.execute(
+                """
+                SELECT r.name AS resource_name, COUNT(*) AS booking_count
+                FROM bookings AS b
+                JOIN resources AS r ON r.id = b.resource_id
+                WHERE b.status = 'approved'
+                """
+                + (" AND b.booking_date = ?" if selected_date else "")
+                + """
+                GROUP BY r.id, r.name
+                ORDER BY booking_count DESC, r.name
+                LIMIT 5
+                """,
+                parameters,
+            ).fetchall()
+
+            for row in connection.execute(
+                "SELECT category, COUNT(*) AS count "
+                f"FROM facility_issues{issue_filter} GROUP BY category",
+                parameters,
+            ):
+                issue_category_counts[row["category"]] = row["count"]
+
+        return {
+            "analytics_date": selected_date,
+            "booking_counts": booking_counts,
+            "booking_total": sum(booking_counts.values()),
+            "issue_status_counts": issue_status_counts,
+            "issue_total": sum(issue_status_counts.values()),
+            "top_facilities": top_facilities,
+            "issue_category_counts": issue_category_counts,
         }
 
     @app.before_request
@@ -606,6 +681,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.get("/admin")
     @role_required("admin")
     def admin_dashboard():
+        analytics_date = request.args.get("analytics_date", "")
         return render_template(
             "dashboard.html",
             **dashboard_data(
@@ -615,6 +691,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 request.args.get("resource_type", "").strip(),
                 is_admin=True,
             ),
+            **admin_analytics(analytics_date),
         )
 
     @app.get("/health")

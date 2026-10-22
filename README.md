@@ -19,8 +19,9 @@ A beginner-friendly Flask and SQLite MVP for managing campus rooms, equipment bo
 - Students and staff can submit facility issue reports and view only their own reports. Reports include a title, description, campus location, category, status, and creation time.
 - Admins can view all issue reports and change their status to Open, In Progress, or Resolved.
 - Admins can approve or reject pending booking requests. Approval rechecks for overlapping active bookings inside a SQLite write transaction.
+- The admin dashboard includes database-backed booking and issue totals, status counts, top facilities by approved bookings, and issue counts by category. Admins can optionally filter analytics to a calendar day.
 
-Analytics, audit views, and optional AI assistance are not implemented yet.
+Audit views and optional AI assistance are not implemented yet.
 
 ## Requirements
 
@@ -85,7 +86,7 @@ Copy `.env.example` as a reference for environment variables. The application re
 
 ## Next stages
 
-1. Analytics, audit views, and notifications.
+1. Audit views and notifications.
 2. Optional AI-assisted report classification and deployment preparation.
 
 ## GitHub and Render

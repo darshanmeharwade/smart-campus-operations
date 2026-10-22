@@ -36,6 +36,89 @@
                 {% endif %}
             {% endwith %}
 
+            {% if is_admin %}
+                <section class="booking-section" aria-labelledby="analytics-title">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">CAMPUS OVERVIEW</p>
+                            <h2 id="analytics-title">Operations analytics</h2>
+                            <p class="resource-meta">
+                                Booking counts use booking date; issue counts use report creation date.
+                            </p>
+                        </div>
+                    </div>
+
+                    <form class="analytics-filter" method="get" action="{{ url_for('admin_dashboard') }}">
+                        <div class="field">
+                            <label for="analytics-date">Filter analytics by date</label>
+                            <input id="analytics-date" name="analytics_date" type="date" value="{{ analytics_date }}">
+                        </div>
+                        <button class="primary-button" type="submit">Apply filter</button>
+                        {% if analytics_date %}
+                            <a class="secondary-link" href="{{ url_for('admin_dashboard') }}">Clear date filter</a>
+                        {% endif %}
+                    </form>
+
+                    <div class="analytics-grid" aria-label="Campus totals">
+                        <article class="analytics-card">
+                            <span class="small-label">Total bookings</span>
+                            <strong>{{ booking_total }}</strong>
+                            <ul class="metric-breakdown">
+                                {% for status, count in booking_counts.items() %}
+                                    <li><span>{{ status|title }}</span><span>{{ count }}</span></li>
+                                {% endfor %}
+                            </ul>
+                        </article>
+                        <article class="analytics-card">
+                            <span class="small-label">Facility issue reports</span>
+                            <strong>{{ issue_total }}</strong>
+                            <ul class="metric-breakdown">
+                                {% for status, count in issue_status_counts.items() %}
+                                    <li><span>{{ status.replace("_", " ")|title }}</span><span>{{ count }}</span></li>
+                                {% endfor %}
+                            </ul>
+                        </article>
+                    </div>
+
+                    <div class="analytics-tables">
+                        <section class="analytics-panel" aria-labelledby="facility-analytics-title">
+                            <h3 id="facility-analytics-title">Most frequently booked facilities</h3>
+                            {% if top_facilities %}
+                                <div class="table-wrap">
+                                    <table class="booking-table">
+                                        <thead><tr><th scope="col">Facility</th><th scope="col">Approved bookings</th></tr></thead>
+                                        <tbody>
+                                            {% for facility in top_facilities %}
+                                                <tr>
+                                                    <td>{{ facility["resource_name"] }}</td>
+                                                    <td>{{ facility["booking_count"] }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="empty-state">No approved bookings for this period.</div>
+                            {% endif %}
+                        </section>
+
+                        <section class="analytics-panel" aria-labelledby="category-analytics-title">
+                            <h3 id="category-analytics-title">Issue reports by category</h3>
+                            <div class="table-wrap">
+                                <table class="booking-table">
+                                    <thead><tr><th scope="col">Category</th><th scope="col">Reports</th></tr></thead>
+                                    <tbody>
+                                        {% for category, count in issue_category_counts.items() %}
+                                            <tr><td>{{ category|title }}</td><td>{{ count }}</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                </section>
+            {% endif %}
+
             <section class="booking-section" aria-labelledby="availability-title">
                 <div class="section-heading">
                     <div>
