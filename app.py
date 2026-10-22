@@ -28,6 +28,8 @@ from db import get_connection, init_db
 
 BASE_DIR = Path(__file__).resolve().parent
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+ISSUE_CATEGORIES = {"electrical", "plumbing", "furniture", "network", "cleaning", "other"}
+ISSUE_STATUSES = {"open", "in_progress", "resolved"}
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -123,6 +125,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         start_time: str = "",
         end_time: str = "",
         resource_type: str = "",
+        is_admin: bool = False,
     ) -> dict:
         slot = None
         search_error = None
@@ -176,10 +179,48 @@ def create_app(test_config: dict | None = None) -> Flask:
                 (g.current_user["id"],),
             ).fetchall()
 
+            if is_admin:
+                issues = connection.execute(
+                    """
+                    SELECT i.id, i.title, i.description, i.location, i.category,
+                           i.status, i.created_at, u.name AS reporter_name
+                    FROM facility_issues AS i
+                    JOIN users AS u ON u.id = i.user_id
+                    ORDER BY i.created_at DESC, i.id DESC
+                    """
+                ).fetchall()
+                pending_bookings = connection.execute(
+                    """
+                    SELECT b.id, b.purpose, b.booking_date, b.start_time,
+                           b.end_time, u.name AS requester_name,
+                           r.name AS resource_name
+                    FROM bookings AS b
+                    JOIN users AS u ON u.id = b.user_id
+                    JOIN resources AS r ON r.id = b.resource_id
+                    WHERE b.status = 'pending'
+                    ORDER BY b.booking_date, b.start_time, b.id
+                    """
+                ).fetchall()
+            else:
+                issues = connection.execute(
+                    """
+                    SELECT id, title, description, location, category,
+                           status, created_at
+                    FROM facility_issues
+                    WHERE user_id = ?
+                    ORDER BY created_at DESC, id DESC
+                    """,
+                    (g.current_user["id"],),
+                ).fetchall()
+                pending_bookings = []
+
         return {
             "user": g.current_user,
             "resources": resources,
             "bookings": bookings,
+            "issues": issues,
+            "pending_bookings": pending_bookings,
+            "is_admin": is_admin,
             "availability_date": availability_date,
             "start_time": start_time,
             "end_time": end_time,
@@ -402,6 +443,166 @@ def create_app(test_config: dict | None = None) -> Flask:
             flash("That booking cannot be cancelled.")
         return redirect(dashboard_url())
 
+    @app.post("/issues")
+    @login_required
+    def submit_issue():
+        if not valid_csrf_token():
+            abort(400, description="Invalid security token. Refresh and try again.")
+
+        title = request.form.get("title", "").strip()
+        description = request.form.get("description", "").strip()
+        location = request.form.get("location", "").strip()
+        category = request.form.get("category", "").strip().lower()
+        if (
+            not 1 <= len(title) <= 120
+            or not 1 <= len(description) <= 2000
+            or not 1 <= len(location) <= 160
+            or category not in ISSUE_CATEGORIES
+        ):
+            flash("Enter a title, description, location, and valid issue category.")
+            return redirect(dashboard_url())
+
+        now = datetime.now().astimezone().isoformat(timespec="seconds")
+        try:
+            with get_connection(app.config["DATABASE"]) as connection:
+                connection.execute(
+                    """
+                    INSERT INTO facility_issues
+                        (user_id, title, category, description, location,
+                         priority, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, 'medium', 'open', ?, ?)
+                    """,
+                    (
+                        g.current_user["id"],
+                        title,
+                        category,
+                        description,
+                        location,
+                        now,
+                        now,
+                    ),
+                )
+        except sqlite3.Error:
+            app.logger.exception("Could not save facility issue report")
+            flash("We could not save that report. Please try again.")
+            return redirect(dashboard_url())
+
+        flash("Facility issue report submitted.")
+        return redirect(dashboard_url())
+
+    @app.post("/issues/<int:issue_id>/status")
+    @role_required("admin")
+    def update_issue_status(issue_id: int):
+        if not valid_csrf_token():
+            abort(400, description="Invalid security token. Refresh and try again.")
+
+        status = request.form.get("status", "").strip().lower()
+        if status not in ISSUE_STATUSES:
+            abort(400, description="Choose a valid issue status.")
+
+        now = datetime.now().astimezone().isoformat(timespec="seconds")
+        with get_connection(app.config["DATABASE"]) as connection:
+            cursor = connection.execute(
+                """
+                UPDATE facility_issues
+                SET status = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (status, now, issue_id),
+            )
+
+        if cursor.rowcount == 1:
+            flash("Issue status updated.")
+        else:
+            flash("That issue report could not be found.")
+        return redirect(url_for("admin_dashboard"))
+
+    @app.post("/admin/bookings/<int:booking_id>/approve")
+    @role_required("admin")
+    def approve_booking(booking_id: int):
+        if not valid_csrf_token():
+            abort(400, description="Invalid security token. Refresh and try again.")
+
+        try:
+            with get_connection(app.config["DATABASE"]) as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                booking = connection.execute(
+                    """
+                    SELECT resource_id, booking_date, start_time, end_time
+                    FROM bookings
+                    WHERE id = ? AND status = 'pending'
+                    """,
+                    (booking_id,),
+                ).fetchone()
+                if booking is None:
+                    flash("That pending booking could not be found.")
+                    return redirect(url_for("admin_dashboard"))
+
+                conflict = connection.execute(
+                    """
+                    SELECT 1
+                    FROM bookings
+                    WHERE resource_id = ? AND booking_date = ?
+                      AND id != ? AND status IN ('pending', 'approved')
+                      AND start_time < ? AND end_time > ?
+                    LIMIT 1
+                    """,
+                    (
+                        booking["resource_id"],
+                        booking["booking_date"],
+                        booking_id,
+                        booking["end_time"],
+                        booking["start_time"],
+                    ),
+                ).fetchone()
+                if conflict is not None:
+                    flash("This booking conflicts with another active booking and cannot be approved.")
+                    return redirect(url_for("admin_dashboard"))
+
+                connection.execute(
+                    """
+                    UPDATE bookings
+                    SET status = 'approved', updated_at = ?
+                    WHERE id = ? AND status = 'pending'
+                    """,
+                    (
+                        datetime.now().astimezone().isoformat(timespec="seconds"),
+                        booking_id,
+                    ),
+                )
+        except sqlite3.Error:
+            app.logger.exception("Could not approve facility booking")
+            flash("We could not approve that booking. Please try again.")
+            return redirect(url_for("admin_dashboard"))
+
+        flash("Booking approved.")
+        return redirect(url_for("admin_dashboard"))
+
+    @app.post("/admin/bookings/<int:booking_id>/reject")
+    @role_required("admin")
+    def reject_booking(booking_id: int):
+        if not valid_csrf_token():
+            abort(400, description="Invalid security token. Refresh and try again.")
+
+        with get_connection(app.config["DATABASE"]) as connection:
+            cursor = connection.execute(
+                """
+                UPDATE bookings
+                SET status = 'rejected', updated_at = ?
+                WHERE id = ? AND status = 'pending'
+                """,
+                (
+                    datetime.now().astimezone().isoformat(timespec="seconds"),
+                    booking_id,
+                ),
+            )
+
+        if cursor.rowcount == 1:
+            flash("Booking rejected.")
+        else:
+            flash("That pending booking could not be found.")
+        return redirect(url_for("admin_dashboard"))
+
     @app.get("/admin")
     @role_required("admin")
     def admin_dashboard():
@@ -412,8 +613,8 @@ def create_app(test_config: dict | None = None) -> Flask:
                 request.args.get("start_time", "").strip(),
                 request.args.get("end_time", "").strip(),
                 request.args.get("resource_type", "").strip(),
+                is_admin=True,
             ),
-            is_admin=True,
         )
 
     @app.get("/health")

@@ -45,9 +45,13 @@ CREATE TABLE IF NOT EXISTS facility_issues (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     resource_id INTEGER,
+    title TEXT NOT NULL DEFAULT 'Facility issue'
+        CHECK (length(trim(title)) BETWEEN 1 AND 120),
     category TEXT NOT NULL
         CHECK (category IN ('electrical', 'plumbing', 'furniture', 'network', 'cleaning', 'other')),
     description TEXT NOT NULL CHECK (length(trim(description)) BETWEEN 1 AND 2000),
+    location TEXT NOT NULL DEFAULT 'Not specified'
+        CHECK (length(trim(location)) BETWEEN 1 AND 160),
     priority TEXT NOT NULL CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
     status TEXT NOT NULL DEFAULT 'open'
         CHECK (status IN ('open', 'in_progress', 'resolved')),

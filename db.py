@@ -47,6 +47,27 @@ def init_db(database_path: str) -> None:
 
     with get_connection(str(database)) as connection:
         connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        issue_columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(facility_issues)")
+        }
+        if "title" not in issue_columns:
+            connection.execute(
+                """
+                ALTER TABLE facility_issues
+                ADD COLUMN title TEXT NOT NULL DEFAULT 'Facility issue'
+                    CHECK (length(trim(title)) BETWEEN 1 AND 120)
+                """
+            )
+        if "location" not in issue_columns:
+            connection.execute(
+                """
+                ALTER TABLE facility_issues
+                ADD COLUMN location TEXT NOT NULL DEFAULT 'Not specified'
+                    CHECK (length(trim(location)) BETWEEN 1 AND 160)
+                """
+            )
+
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
         for name, email, role, password in DEMO_USERS:

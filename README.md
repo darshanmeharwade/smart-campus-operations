@@ -1,6 +1,6 @@
 # Smart Campus Operations and Facility Booking Platform
 
-A beginner-friendly Flask and SQLite MVP for managing campus rooms, equipment bookings, and facility reports. The project is being built in stages; this repository currently contains **Stage 1 (application and database foundation), Stage 2 (authentication and role access), and Stage 3 (facility booking)**.
+A beginner-friendly Flask and SQLite MVP for managing campus rooms, equipment bookings, and facility reports. This repository currently contains Stages 1–4: the application foundation, authentication and role access, facility booking, issue reporting, and admin booking workflows.
 
 ## Implemented so far
 
@@ -11,13 +11,16 @@ A beginner-friendly Flask and SQLite MVP for managing campus rooms, equipment bo
 - A `/health` endpoint for a basic application check.
 - Login and logout with secure password hash verification.
 - Session expiry, signed session cookies, and server-side role checks.
-- CSRF checks on login and logout forms.
-- An authenticated user dashboard and an admin-only route.
-- Automated tests for login, logout, input/CSRF validation, and role permissions.
+- CSRF checks on state-changing login, logout, booking, issue-reporting, and admin actions.
+- An authenticated user dashboard and a role-protected admin dashboard.
+- Automated tests for authentication, role permissions, booking behavior, issue reports, and admin workflows.
 - Authenticated users can filter active rooms/equipment, check time-slot availability, submit booking requests, view their bookings, and cancel their own pending or approved bookings.
 - Overlapping active booking requests are blocked server-side inside a SQLite write transaction; cancelled and rejected bookings do not block a slot.
+- Students and staff can submit facility issue reports and view only their own reports. Reports include a title, description, campus location, category, status, and creation time.
+- Admins can view all issue reports and change their status to Open, In Progress, or Resolved.
+- Admins can approve or reject pending booking requests. Approval rechecks for overlapping active bookings inside a SQLite write transaction.
 
-Facility reporting, admin booking approvals, analytics, and AI assistance are not implemented yet.
+Analytics, audit views, and optional AI assistance are not implemented yet.
 
 ## Requirements
 
@@ -47,7 +50,7 @@ To run automated tests:
 python -m unittest discover -s tests -v
 ```
 
-The database is created automatically at `instance/campus.db`. To use another location, set `DATABASE_PATH`.
+The database is created automatically at `instance/campus.db`. Existing databases are migrated automatically to add issue title and location fields. To use another location, set `DATABASE_PATH`.
 
 ## Demo accounts
 
@@ -59,14 +62,14 @@ These accounts are seeded on first initialization. Passwords are hashed before i
 | Staff | `staff@campus.edu` | `Staff123!` |
 | Admin | `admin@campus.edu` | `Admin123!` |
 
-The demo accounts are seeded on first initialization and are ready for Stage 2 sign-in.
+The demo accounts are seeded on first initialization and can use the Stage 4 admin workflows.
 
 ## Database overview
 
 - `users`: campus users, role, and password hash.
 - `resources`: rooms and equipment.
 - `bookings`: requested resource, purpose, date/time, and booking status.
-- `facility_issues`: category, description, priority, and issue status.
+- `facility_issues`: reporter, title, description, campus location, category, priority, status, and timestamps.
 - `audit_logs`: actor and details for important actions.
 
 Foreign keys, basic `CHECK` constraints, uniqueness rules, and lookup indexes are defined in `schema.sql`. Initialization is safe to rerun and uses unique keys to avoid duplicate demo records.
@@ -82,9 +85,8 @@ Copy `.env.example` as a reference for environment variables. The application re
 
 ## Next stages
 
-1. Facility reporting and admin booking approvals.
-2. Analytics, audit views, and notifications.
-3. Optional AI-assisted report classification and deployment preparation.
+1. Analytics, audit views, and notifications.
+2. Optional AI-assisted report classification and deployment preparation.
 
 ## GitHub and Render
 
@@ -96,4 +98,4 @@ After the remaining application stages are complete:
 4. Set the start command to `gunicorn app:app` after adding Gunicorn to `requirements.txt` in the deployment stage.
 5. Add a strong `SECRET_KEY` environment variable in Render.
 
-The current Stage 1 starter is not yet a complete or deployable booking portal.
+This is a hackathon MVP and should be configured with a strong `SECRET_KEY` before deployment.

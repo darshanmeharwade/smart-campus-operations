@@ -267,7 +267,8 @@ body {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
     width: 100%;
     min-width: 0;
     min-height: 40px;
@@ -281,7 +282,8 @@ body {
 }
 
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
     border-color: #0d786c;
     outline: 3px solid rgba(13, 120, 108, 0.16);
 }
@@ -363,6 +365,21 @@ body {
     color: #88631b;
 }
 
+.status-open {
+    background: #fff5dd;
+    color: #88631b;
+}
+
+.status-in_progress {
+    background: #e8f2fb;
+    color: #285d89;
+}
+
+.status-resolved {
+    background: #e3f5eb;
+    color: #24724b;
+}
+
 .booking-form {
     display: grid;
     gap: 12px;
@@ -375,6 +392,45 @@ body {
 
 .booking-form .primary-button {
     justify-self: start;
+}
+
+.issue-form {
+    display: grid;
+    gap: 14px;
+    max-width: 680px;
+    padding: 18px;
+    border: 1px solid #e2ebeb;
+    border-radius: 14px;
+    background: #f8fbfa;
+}
+
+.issue-form .field textarea,
+.inline-form select {
+    width: 100%;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid #cedcdd;
+    border-radius: 8px;
+    background: #fff;
+    color: #142b3b;
+    font: inherit;
+    font-size: 0.83rem;
+}
+
+.issue-form .primary-button {
+    justify-self: start;
+}
+
+.inline-form,
+.action-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.action-group .text-button:first-child {
+    color: #24724b;
 }
 
 .table-wrap {

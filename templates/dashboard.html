@@ -169,6 +169,150 @@
                     <div class="empty-state">You have no bookings yet. Request a facility above to get started.</div>
                 {% endif %}
             </section>
+
+            {% if is_admin %}
+                <section class="booking-section" aria-labelledby="pending-bookings-title">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">ADMIN ACTIONS</p>
+                            <h2 id="pending-bookings-title">Pending booking requests</h2>
+                        </div>
+                    </div>
+
+                    {% if pending_bookings %}
+                        <div class="table-wrap">
+                            <table class="booking-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Requester</th>
+                                        <th scope="col">Facility</th>
+                                        <th scope="col">Date</th>
+                                        <th scope="col">Time</th>
+                                        <th scope="col">Purpose</th>
+                                        <th scope="col">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in pending_bookings %}
+                                        <tr>
+                                            <td data-label="Requester">{{ booking["requester_name"] }}</td>
+                                            <td data-label="Facility">{{ booking["resource_name"] }}</td>
+                                            <td data-label="Date">{{ booking["booking_date"] }}</td>
+                                            <td data-label="Time">{{ booking["start_time"] }}–{{ booking["end_time"] }}</td>
+                                            <td data-label="Purpose">{{ booking["purpose"] }}</td>
+                                            <td data-label="Actions">
+                                                <div class="action-group">
+                                                    <form method="post" action="{{ url_for('approve_booking', booking_id=booking['id']) }}">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <button class="text-button" type="submit">Approve</button>
+                                                    </form>
+                                                    <form method="post" action="{{ url_for('reject_booking', booking_id=booking['id']) }}">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <button class="text-button" type="submit">Reject</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-state">There are no pending booking requests.</div>
+                    {% endif %}
+                </section>
+            {% endif %}
+
+            <section class="booking-section" aria-labelledby="report-issue-title">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">CAMPUS OPERATIONS</p>
+                        <h2 id="report-issue-title">Report a facility issue</h2>
+                    </div>
+                </div>
+                <form class="issue-form" method="post" action="{{ url_for('submit_issue') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="field">
+                        <label for="issue-title">Title</label>
+                        <input id="issue-title" name="title" type="text" maxlength="120" required>
+                    </div>
+                    <div class="field">
+                        <label for="issue-location">Location</label>
+                        <input id="issue-location" name="location" type="text" maxlength="160" placeholder="Building and room" required>
+                    </div>
+                    <div class="field">
+                        <label for="issue-category">Category</label>
+                        <select id="issue-category" name="category" required>
+                            <option value="">Choose a category</option>
+                            <option value="electrical">Electrical</option>
+                            <option value="plumbing">Plumbing</option>
+                            <option value="furniture">Furniture</option>
+                            <option value="network">Network</option>
+                            <option value="cleaning">Cleaning</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="issue-description">Description</label>
+                        <textarea id="issue-description" name="description" maxlength="2000" rows="4" required></textarea>
+                    </div>
+                    <button class="primary-button" type="submit">Submit report</button>
+                </form>
+            </section>
+
+            <section class="booking-section" aria-labelledby="issues-title">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">{{ "CAMPUS REPORTS" if is_admin else "YOUR REPORTS" }}</p>
+                        <h2 id="issues-title">{{ "Facility issue reports" if is_admin else "My issue reports" }}</h2>
+                    </div>
+                </div>
+                {% if issues %}
+                    <div class="table-wrap">
+                        <table class="booking-table">
+                            <thead>
+                                <tr>
+                                    {% if is_admin %}<th scope="col">Reporter</th>{% endif %}
+                                    <th scope="col">Issue</th>
+                                    <th scope="col">Location</th>
+                                    <th scope="col">Category</th>
+                                    <th scope="col">Description</th>
+                                    <th scope="col">Status</th>
+                                    {% if is_admin %}<th scope="col">Update status</th>{% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for issue in issues %}
+                                    <tr>
+                                        {% if is_admin %}<td data-label="Reporter">{{ issue["reporter_name"] }}</td>{% endif %}
+                                        <td data-label="Issue">{{ issue["title"] }}</td>
+                                        <td data-label="Location">{{ issue["location"] }}</td>
+                                        <td data-label="Category">{{ issue["category"]|title }}</td>
+                                        <td data-label="Description">{{ issue["description"] }}</td>
+                                        <td data-label="Status"><span class="status-badge status-{{ issue['status'] }}">{{ issue["status"].replace("_", " ")|title }}</span></td>
+                                        {% if is_admin %}
+                                            <td data-label="Update status">
+                                                <form class="inline-form" method="post" action="{{ url_for('update_issue_status', issue_id=issue['id']) }}">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <label class="visually-hidden" for="issue-status-{{ issue['id'] }}">Status for {{ issue["title"] }}</label>
+                                                    <select id="issue-status-{{ issue['id'] }}" name="status">
+                                                        <option value="open" {{ "selected" if issue["status"] == "open" else "" }}>Open</option>
+                                                        <option value="in_progress" {{ "selected" if issue["status"] == "in_progress" else "" }}>In Progress</option>
+                                                        <option value="resolved" {{ "selected" if issue["status"] == "resolved" else "" }}>Resolved</option>
+                                                    </select>
+                                                    <button class="text-button" type="submit">Save</button>
+                                                </form>
+                                            </td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">{{ "No facility issue reports have been submitted." if is_admin else "You have not submitted any issue reports yet." }}</div>
+                {% endif %}
+            </section>
         </section>
 
         <footer class="page-footer">
