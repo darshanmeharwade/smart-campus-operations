@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Smart Campus facility booking workspace">
+    <title>{{ "Admin" if is_admin|default(false) else "Dashboard" }} | Smart Campus</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <main class="page-shell">
+        <header class="topbar">
+            <a class="brand" href="{{ url_for('dashboard') }}" aria-label="Smart Campus dashboard">
+                <span class="brand-mark" aria-hidden="true">SC</span>
+                <span>Smart Campus</span>
+            </a>
+            <form method="post" action="{{ url_for('logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="secondary-button" type="submit">Sign out</button>
+            </form>
+        </header>
+
+        <section class="dashboard-card" aria-labelledby="dashboard-title">
+            <p class="eyebrow">{{ "ADMINISTRATOR WORKSPACE" if is_admin|default(false) else "CAMPUS WORKSPACE" }}</p>
+            <h1 id="dashboard-title">Hello, {{ user["name"] }}.</h1>
+            <p class="intro">
+                You are signed in as
+                <span class="role-badge">{{ user["role"]|title }}</span>.
+            </p>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="notice success-notice" role="status">
+                        {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="booking-section" aria-labelledby="availability-title">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">FACILITIES</p>
+                        <h2 id="availability-title">Find a space</h2>
+                    </div>
+                </div>
+
+                <form class="search-form" method="get" action="{{ url_for('admin_dashboard') if is_admin|default(false) else url_for('dashboard') }}">
+                    <div class="field">
+                        <label for="resource_type">Facility type</label>
+                        <select id="resource_type" name="resource_type">
+                            <option value="" {{ "selected" if not resource_type else "" }}>All facilities</option>
+                            <option value="room" {{ "selected" if resource_type == "room" else "" }}>Rooms</option>
+                            <option value="equipment" {{ "selected" if resource_type == "equipment" else "" }}>Equipment</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="availability_date">Date</label>
+                        <input id="availability_date" name="date" type="date" min="{{ today }}" value="{{ availability_date }}">
+                    </div>
+                    <div class="field">
+                        <label for="search_start_time">Start time</label>
+                        <input id="search_start_time" name="start_time" type="time" value="{{ start_time }}">
+                    </div>
+                    <div class="field">
+                        <label for="search_end_time">End time</label>
+                        <input id="search_end_time" name="end_time" type="time" value="{{ end_time }}">
+                    </div>
+                    <button class="primary-button search-button" type="submit">Check availability</button>
+                </form>
+
+                {% if search_error %}
+                    <div class="notice error-notice" role="alert">{{ search_error }}</div>
+                {% endif %}
+
+                {% if resources %}
+                    <div class="resource-grid">
+                        {% for resource in resources %}
+                            <article class="resource-card">
+                                <div class="resource-card-heading">
+                                    <div>
+                                        <span class="resource-kind">{{ resource["resource_type"]|title }}</span>
+                                        <h3>{{ resource["name"] }}</h3>
+                                    </div>
+                                    {% if resource["available"] is sameas true %}
+                                        <span class="availability-badge available">Available</span>
+                                    {% elif resource["available"] is sameas false %}
+                                        <span class="availability-badge unavailable">Booked</span>
+                                    {% else %}
+                                        <span class="availability-badge unchecked">Check slot</span>
+                                    {% endif %}
+                                </div>
+                                <p class="resource-meta">{{ resource["location"] }} · Capacity {{ resource["capacity"] }}</p>
+                                <form class="booking-form" method="post" action="{{ url_for('create_booking') }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="resource_id" value="{{ resource['id'] }}">
+                                    <div class="booking-fields">
+                                        <div class="field">
+                                            <label for="date-{{ resource['id'] }}">Date</label>
+                                            <input id="date-{{ resource['id'] }}" name="booking_date" type="date" min="{{ today }}" value="{{ availability_date }}" required>
+                                        </div>
+                                        <div class="field">
+                                            <label for="start-{{ resource['id'] }}">Start</label>
+                                            <input id="start-{{ resource['id'] }}" name="start_time" type="time" value="{{ start_time }}" required>
+                                        </div>
+                                        <div class="field">
+                                            <label for="end-{{ resource['id'] }}">End</label>
+                                            <input id="end-{{ resource['id'] }}" name="end_time" type="time" value="{{ end_time }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="field">
+                                        <label for="purpose-{{ resource['id'] }}">Purpose</label>
+                                        <input id="purpose-{{ resource['id'] }}" name="purpose" type="text" maxlength="500" placeholder="e.g. Project team meeting" required>
+                                    </div>
+                                    <button class="primary-button" type="submit">Request booking</button>
+                                </form>
+                            </article>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state">No active facilities match this filter.</div>
+                {% endif %}
+            </section>
+
+            <section class="booking-section" aria-labelledby="bookings-title">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">YOUR REQUESTS</p>
+                        <h2 id="bookings-title">My bookings</h2>
+                    </div>
+                </div>
+
+                {% if bookings %}
+                    <div class="table-wrap">
+                        <table class="booking-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Facility</th>
+                                    <th scope="col">Date</th>
+                                    <th scope="col">Time</th>
+                                    <th scope="col">Purpose</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for booking in bookings %}
+                                    <tr>
+                                        <td data-label="Facility">{{ booking["resource_name"] }}</td>
+                                        <td data-label="Date">{{ booking["booking_date"] }}</td>
+                                        <td data-label="Time">{{ booking["start_time"] }}–{{ booking["end_time"] }}</td>
+                                        <td data-label="Purpose">{{ booking["purpose"] }}</td>
+                                        <td data-label="Status"><span class="status-badge status-{{ booking['status'] }}">{{ booking["status"]|title }}</span></td>
+                                        <td data-label="Actions">
+                                            {% if booking["status"] in ("pending", "approved") %}
+                                                <form method="post" action="{{ url_for('cancel_booking', booking_id=booking['id']) }}">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button class="text-button" type="submit">Cancel</button>
+                                                </form>
+                                            {% else %}
+                                                <span class="muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">You have no bookings yet. Request a facility above to get started.</div>
+                {% endif %}
+            </section>
+        </section>
+
+        <footer class="page-footer">
+            <span>Smart Campus Operations</span>
+            <span>Signed in as {{ user["email"] }}</span>
+        </footer>
+    </main>
+</body>
+</html>
