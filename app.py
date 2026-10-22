@@ -24,6 +24,7 @@ from flask import (
 from werkzeug.security import check_password_hash
 
 from db import get_connection, init_db
+from issue_triage import recommend_issue_triage
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -192,7 +193,8 @@ def create_app(test_config: dict | None = None) -> Flask:
                 issues = connection.execute(
                     """
                     SELECT i.id, i.title, i.description, i.location, i.category,
-                           i.status, i.created_at, u.name AS reporter_name
+                           i.status, i.created_at, i.admin_category,
+                           i.admin_priority, u.name AS reporter_name
                     FROM facility_issues AS i
                     JOIN users AS u ON u.id = i.user_id
                     ORDER BY i.created_at DESC, i.id DESC
@@ -222,6 +224,15 @@ def create_app(test_config: dict | None = None) -> Flask:
                     (g.current_user["id"],),
                 ).fetchall()
                 pending_bookings = []
+
+        if is_admin:
+            issues = [
+                {
+                    **dict(issue),
+                    **recommend_issue_triage(dict(issue)),
+                }
+                for issue in issues
+            ]
 
         return {
             "user": g.current_user,
@@ -588,6 +599,39 @@ def create_app(test_config: dict | None = None) -> Flask:
 
         if cursor.rowcount == 1:
             flash("Issue status updated.")
+        else:
+            flash("That issue report could not be found.")
+        return redirect(url_for("admin_dashboard"))
+
+    @app.post("/issues/<int:issue_id>/triage")
+    @role_required("admin")
+    def confirm_issue_triage(issue_id: int):
+        if not valid_csrf_token():
+            abort(400, description="Invalid security token. Refresh and try again.")
+
+        category = request.form.get("admin_category", "").strip().lower()
+        priority = request.form.get("admin_priority", "").strip().lower()
+        if category not in ISSUE_CATEGORIES or priority not in {
+            "critical",
+            "high",
+            "medium",
+            "low",
+        }:
+            abort(400, description="Choose a valid category and priority.")
+
+        now = datetime.now().astimezone().isoformat(timespec="seconds")
+        with get_connection(app.config["DATABASE"]) as connection:
+            cursor = connection.execute(
+                """
+                UPDATE facility_issues
+                SET admin_category = ?, admin_priority = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (category, priority, now, issue_id),
+            )
+
+        if cursor.rowcount == 1:
+            flash("Admin triage decision saved. The submitted report is unchanged.")
         else:
             flash("That issue report could not be found.")
         return redirect(url_for("admin_dashboard"))

@@ -506,6 +506,35 @@ body {
     align-items: center;
 }
 
+.triage-recommendation,
+.triage-form {
+    display: grid;
+    gap: 8px;
+    min-width: 160px;
+}
+
+.triage-recommendation span,
+.triage-recommendation small,
+.triage-form small {
+    color: #607681;
+    line-height: 1.45;
+}
+
+.triage-recommendation strong {
+    color: #1c3d48;
+}
+
+.triage-form select {
+    width: 100%;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid #cedcdd;
+    border-radius: 8px;
+    background: #fff;
+    color: #253c47;
+    font: inherit;
+}
+
 .action-group .text-button:first-child {
     color: #24724b;
 }

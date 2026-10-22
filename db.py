@@ -67,6 +67,31 @@ def init_db(database_path: str) -> None:
                     CHECK (length(trim(location)) BETWEEN 1 AND 160)
                 """
             )
+        if "admin_category" not in issue_columns:
+            connection.execute(
+                """
+                ALTER TABLE facility_issues
+                ADD COLUMN admin_category TEXT
+                    CHECK (
+                        admin_category IS NULL OR admin_category IN (
+                            'electrical', 'plumbing', 'furniture',
+                            'network', 'cleaning', 'other'
+                        )
+                    )
+                """
+            )
+        if "admin_priority" not in issue_columns:
+            connection.execute(
+                """
+                ALTER TABLE facility_issues
+                ADD COLUMN admin_priority TEXT
+                    CHECK (
+                        admin_priority IS NULL OR admin_priority IN (
+                            'critical', 'high', 'medium', 'low'
+                        )
+                    )
+                """
+            )
 
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 

@@ -360,8 +360,12 @@
                                     <th scope="col">Location</th>
                                     <th scope="col">Category</th>
                                     <th scope="col">Description</th>
+                                    {% if is_admin %}<th scope="col">Triage suggestion</th>{% endif %}
                                     <th scope="col">Status</th>
-                                    {% if is_admin %}<th scope="col">Update status</th>{% endif %}
+                                    {% if is_admin %}
+                                        <th scope="col">Admin decision</th>
+                                        <th scope="col">Update status</th>
+                                    {% endif %}
                                 </tr>
                             </thead>
                             <tbody>
@@ -372,8 +376,40 @@
                                         <td data-label="Location">{{ issue["location"] }}</td>
                                         <td data-label="Category">{{ issue["category"]|title }}</td>
                                         <td data-label="Description">{{ issue["description"] }}</td>
+                                        {% if is_admin %}
+                                            <td data-label="Triage suggestion">
+                                                <div class="triage-recommendation">
+                                                    <strong>{{ issue["recommended_category"]|title }} · {{ issue["recommended_priority"] }}</strong>
+                                                    <span>{{ issue["triage_reason"] }}</span>
+                                                    <small>Rule-based suggestion; review before deciding.</small>
+                                                </div>
+                                            </td>
+                                        {% endif %}
                                         <td data-label="Status"><span class="status-badge status-{{ issue['status'] }}">{{ issue["status"].replace("_", " ")|title }}</span></td>
                                         {% if is_admin %}
+                                            <td data-label="Admin decision">
+                                                <form class="triage-form" method="post" action="{{ url_for('confirm_issue_triage', issue_id=issue['id']) }}">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <label class="visually-hidden" for="admin-category-{{ issue['id'] }}">Admin-confirmed category for {{ issue["title"] }}</label>
+                                                    <select id="admin-category-{{ issue['id'] }}" name="admin_category" required>
+                                                        {% for category in ("electrical", "plumbing", "furniture", "network", "cleaning", "other") %}
+                                                            <option value="{{ category }}" {{ "selected" if (issue["admin_category"] or issue["recommended_category"]) == category else "" }}>{{ category|title }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    <label class="visually-hidden" for="admin-priority-{{ issue['id'] }}">Admin-confirmed priority for {{ issue["title"] }}</label>
+                                                    <select id="admin-priority-{{ issue['id'] }}" name="admin_priority" required>
+                                                        {% for priority in ("critical", "high", "medium", "low") %}
+                                                            <option value="{{ priority }}" {{ "selected" if (issue["admin_priority"] or issue["recommended_priority"]|lower) == priority else "" }}>{{ priority|title }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    <button class="text-button" type="submit">Save decision</button>
+                                                    {% if issue["admin_category"] and issue["admin_priority"] %}
+                                                        <small>Saved: {{ issue["admin_category"]|title }} · {{ issue["admin_priority"]|title }}</small>
+                                                    {% else %}
+                                                        <small>No admin decision saved.</small>
+                                                    {% endif %}
+                                                </form>
+                                            </td>
                                             <td data-label="Update status">
                                                 <form class="inline-form" method="post" action="{{ url_for('update_issue_status', issue_id=issue['id']) }}">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

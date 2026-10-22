@@ -1,6 +1,6 @@
 # Smart Campus Operations and Facility Booking Platform
 
-A beginner-friendly Flask and SQLite MVP for managing campus rooms, equipment bookings, and facility reports. This repository currently contains Stages 1–4: the application foundation, authentication and role access, facility booking, issue reporting, and admin booking workflows.
+A beginner-friendly Flask and SQLite MVP for managing campus rooms, equipment bookings, facility reports, and admin issue triage.
 
 ## Implemented so far
 
@@ -20,8 +20,13 @@ A beginner-friendly Flask and SQLite MVP for managing campus rooms, equipment bo
 - Admins can view all issue reports and change their status to Open, In Progress, or Resolved.
 - Admins can approve or reject pending booking requests. Approval rechecks for overlapping active bookings inside a SQLite write transaction.
 - The admin dashboard includes database-backed booking and issue totals, status counts, top facilities by approved bookings, and issue counts by category. Admins can optionally filter analytics to a calendar day.
+- The admin issue list provides local, explainable category and priority suggestions with matched-term explanations. Admins can explicitly save their final category and priority separately from the reporter's original category and description.
 
-Audit views and optional AI assistance are not implemented yet.
+## AI-assisted issue triage
+
+Issue triage runs locally with a deterministic keyword rules engine. It uses report title and description to suggest a category and a priority (Critical, High, Medium, or Low), and shows the matched terms or why the cautious Medium default was used. The existing submitted category remains visible and unchanged. Suggestions are computed for the admin view, not stored as facts; an authenticated admin can explicitly save a final category and priority in separate database fields. The report description is not changed by triage.
+
+This prototype does not train or use a machine-learning model: the project has no suitable labelled issue dataset, and its only application dependency is Flask. The rules are simple heuristics, can miss context or misinterpret wording, and have not been evaluated for accuracy. Treat suggestions as decision support, not emergency assessment or a substitute for administrator review. No issue text is sent to an external service.
 
 ## Requirements
 
@@ -51,7 +56,7 @@ To run automated tests:
 python -m unittest discover -s tests -v
 ```
 
-The database is created automatically at `instance/campus.db`. Existing databases are migrated automatically to add issue title and location fields. To use another location, set `DATABASE_PATH`.
+The database is created automatically at `instance/campus.db`. Existing databases are migrated automatically to add issue title, location, and separate admin triage decision fields. To use another location, set `DATABASE_PATH`.
 
 ## Demo accounts
 
@@ -63,7 +68,7 @@ These accounts are seeded on first initialization. Passwords are hashed before i
 | Staff | `staff@campus.edu` | `Staff123!` |
 | Admin | `admin@campus.edu` | `Admin123!` |
 
-The demo accounts are seeded on first initialization and can use the Stage 4 admin workflows.
+The demo accounts are seeded on first initialization and can use the admin issue-management and triage workflows.
 
 ## Database overview
 
@@ -87,7 +92,7 @@ Copy `.env.example` as a reference for environment variables. The application re
 ## Next stages
 
 1. Audit views and notifications.
-2. Optional AI-assisted report classification and deployment preparation.
+2. Deployment preparation.
 
 ## GitHub and Render
 

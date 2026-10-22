@@ -53,6 +53,16 @@ CREATE TABLE IF NOT EXISTS facility_issues (
     location TEXT NOT NULL DEFAULT 'Not specified'
         CHECK (length(trim(location)) BETWEEN 1 AND 160),
     priority TEXT NOT NULL CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+    admin_category TEXT
+        CHECK (
+            admin_category IS NULL OR admin_category IN (
+                'electrical', 'plumbing', 'furniture', 'network', 'cleaning', 'other'
+            )
+        ),
+    admin_priority TEXT
+        CHECK (
+            admin_priority IS NULL OR admin_priority IN ('critical', 'high', 'medium', 'low')
+        ),
     status TEXT NOT NULL DEFAULT 'open'
         CHECK (status IN ('open', 'in_progress', 'resolved')),
     created_at TEXT NOT NULL,
