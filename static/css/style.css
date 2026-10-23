@@ -138,6 +138,11 @@ body {
     cursor: pointer;
 }
 
+.booking-action-button {
+    margin-top: 0;
+    white-space: nowrap;
+}
+
 .primary-button {
     margin-top: 10px;
     background: #0d6b62;

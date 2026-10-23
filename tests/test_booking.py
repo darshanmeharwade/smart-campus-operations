@@ -222,7 +222,7 @@ class BookingTests(unittest.TestCase):
         self.submit_booking(purpose="Private student booking")
         booking_id = self.stored_bookings()[0]["id"]
         self.client = self.app.test_client()
-        self.login_as("staff@campus.edu", "Staff123!")
+        self.login_as("student2@campus.edu", "Student123!")
 
         response = self.client.post(
             f"/bookings/{booking_id}/cancel",
@@ -235,7 +235,7 @@ class BookingTests(unittest.TestCase):
     def test_user_cannot_view_another_users_bookings(self):
         self.submit_booking(purpose="Private student booking")
         self.client = self.app.test_client()
-        self.login_as("staff@campus.edu", "Staff123!")
+        self.login_as("student2@campus.edu", "Student123!")
 
         response = self.client.get("/dashboard")
         self.assertEqual(response.status_code, 200)

@@ -148,7 +148,7 @@ class IssueTriageTests(unittest.TestCase):
         self.assertEqual(unauthenticated.status_code, 302)
 
         self.client = self.app.test_client()
-        self.login_as("staff@campus.edu", "Staff123!")
+        self.login_as("student2@campus.edu", "Student123!")
         dashboard = self.client.get("/dashboard")
         self.assertNotIn(b"Triage suggestion", dashboard.data)
         denied = self.client.post(
@@ -162,7 +162,7 @@ class IssueTriageTests(unittest.TestCase):
         self.assertEqual(denied.status_code, 403)
 
         self.client = self.app.test_client()
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         dashboard = self.client.get("/admin")
         self.assertIn(b"Triage suggestion", dashboard.data)
         self.assertIn(b"Rule-based suggestion; review before deciding.", dashboard.data)
@@ -212,7 +212,7 @@ class IssueTriageTests(unittest.TestCase):
         self.login_as("student@campus.edu", "Student123!")
         issue = self.submit_issue()
         self.client = self.app.test_client()
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         response = self.client.post(
             f"/issues/{issue['id']}/status",
             data={
@@ -295,7 +295,7 @@ class IssueTriageTests(unittest.TestCase):
             category="plumbing",
         )
         self.client = self.app.test_client()
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         response = self.client.post(
             f"/issues/{issue['id']}/triage",
             data={

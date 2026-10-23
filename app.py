@@ -1,7 +1,6 @@
 """Flask application entry point for the Smart Campus MVP."""
 
 import os
-import re
 import secrets
 import sqlite3
 from datetime import date, datetime, timedelta
@@ -21,14 +20,13 @@ from flask import (
     session,
     url_for,
 )
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
-from db import get_connection, init_db
+from db import ADMIN_IDENTIFIER, DEMO_USERS, get_connection, init_db
 from issue_triage import recommend_issue_triage
 
 
 BASE_DIR = Path(__file__).resolve().parent
-EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 ISSUE_CATEGORIES = {"electrical", "plumbing", "furniture", "network", "cleaning", "other"}
 ISSUE_STATUSES = {"open", "in_progress", "resolved"}
 BOOKING_STATUSES = ("pending", "approved", "rejected", "cancelled")
@@ -45,26 +43,48 @@ ANALYTICS_ISSUE_CATEGORIES = (
 def create_app(test_config: dict | None = None) -> Flask:
     """Create and configure the Flask application."""
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = os.environ.get(
-        "SECRET_KEY", secrets.token_hex(32)
-    )
+    app.config["APP_ENV"] = os.environ.get("APP_ENV", "development").strip().lower()
     app.config["DATABASE"] = os.environ.get(
         "DATABASE_PATH", str(BASE_DIR / "instance" / "campus.db")
     )
     app.config["SESSION_COOKIE_HTTPONLY"] = True
-    app.config["SESSION_COOKIE_SECURE"] = (
-        os.environ.get("SESSION_COOKIE_SECURE", "").lower() == "true"
-    )
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)
     app.config["SESSION_REFRESH_EACH_REQUEST"] = True
+    app.config["DEMO_USERS_ENABLED"] = (
+        os.environ.get("DEMO_USERS_ENABLED", "true").strip().lower() == "true"
+    )
     if test_config is not None:
         app.config.update(test_config)
 
-    init_db(app.config["DATABASE"])
+    is_production = (
+        app.config["APP_ENV"] in {"prod", "production"}
+        or os.environ.get("RENDER", "").strip().lower() == "true"
+    )
+    configured_secret = app.config.get("SECRET_KEY")
+    secret_key = os.environ.get("SECRET_KEY", "").strip()
+    if not secret_key and is_production:
+        raise RuntimeError("SECRET_KEY must be set in production.")
+    app.config["SECRET_KEY"] = (
+        secret_key or configured_secret or secrets.token_hex(32)
+    )
+    app.config["SESSION_COOKIE_SECURE"] = is_production or (
+        os.environ.get("SESSION_COOKIE_SECURE", "").strip().lower() == "true"
+    )
+    app.config["DEMO_USERS_ENABLED"] = (
+        app.config["DEMO_USERS_ENABLED"] and not is_production
+    )
+
+    init_db(
+        app.config["DATABASE"],
+        seed_demo_users=app.config["DEMO_USERS_ENABLED"],
+    )
 
     def destination_for(user) -> str:
-        if user["role"] == "admin":
+        if (
+            user["role"] == "admin"
+            and user["email"].casefold() == ADMIN_IDENTIFIER
+        ):
             return url_for("admin_dashboard")
         return url_for("dashboard")
 
@@ -87,7 +107,13 @@ def create_app(test_config: dict | None = None) -> Flask:
             @wraps(view)
             @login_required
             def wrapped_view(*args, **kwargs):
-                if g.current_user["role"] != required_role:
+                if (
+                    g.current_user["role"] != required_role
+                    or (
+                        required_role == "admin"
+                        and g.current_user["email"].casefold() != ADMIN_IDENTIFIER
+                    )
+                ):
                     abort(403)
                 return view(*args, **kwargs)
 
@@ -360,19 +386,19 @@ def create_app(test_config: dict | None = None) -> Flask:
         if request.method == "POST":
             email_value = request.form.get("email", "")
             password = request.form.get("password", "")
-            email = email_value.strip().lower() if isinstance(email_value, str) else ""
+            email = email_value.strip().casefold() if isinstance(email_value, str) else ""
 
             if not valid_csrf_token():
                 error = "Your form session expired. Please try again."
                 status_code = 400
             elif (
                 not isinstance(password, str)
+                or not email
                 or len(email) > 254
                 or len(password) > 1024
-                or not EMAIL_PATTERN.fullmatch(email)
                 or not password
             ):
-                error = "Enter a valid email address and password."
+                error = "Enter an identifier and password."
                 status_code = 400
             else:
                 with get_connection(app.config["DATABASE"]) as connection:
@@ -385,9 +411,17 @@ def create_app(test_config: dict | None = None) -> Flask:
                         (email,),
                     ).fetchone()
 
+                demo_passwords = {
+                    demo_user[1]: demo_user[3] for demo_user in DEMO_USERS
+                }
+                is_blocked_demo_login = (
+                    not app.config["DEMO_USERS_ENABLED"]
+                    and email in demo_passwords
+                    and password == demo_passwords[email]
+                )
                 if user is None or not check_password_hash(
                     user["password_hash"], password
-                ):
+                ) or is_blocked_demo_login:
                     error = "Email or password is incorrect."
                     status_code = 401
                 else:
@@ -400,6 +434,78 @@ def create_app(test_config: dict | None = None) -> Flask:
 
         return (
             render_template("login.html", error=error, email=email),
+            status_code,
+        )
+
+    @app.route("/register", methods=["GET", "POST"])
+    def register_student():
+        if g.current_user is not None:
+            return redirect(destination_for(g.current_user))
+
+        name = ""
+        email = ""
+        error = None
+        status_code = 200
+
+        if request.method == "POST":
+            name_value = request.form.get("name", "")
+            email_value = request.form.get("email", "")
+            password = request.form.get("password", "")
+            name = name_value.strip() if isinstance(name_value, str) else ""
+            email = email_value.strip().casefold() if isinstance(email_value, str) else ""
+
+            if not valid_csrf_token():
+                error = "Your form session expired. Please try again."
+                status_code = 400
+            elif (
+                len(name) > 100
+                or not name
+                or not email
+                or email == ADMIN_IDENTIFIER
+                or len(email) > 254
+                or not isinstance(password, str)
+                or len(password) < 8
+                or len(password) > 1024
+                or not password.strip()
+            ):
+                error = (
+                    "Enter a name and available identifier, and a password "
+                    "of at least 8 characters."
+                )
+                status_code = 400
+            else:
+                now = datetime.now().astimezone().isoformat(timespec="seconds")
+                try:
+                    with get_connection(app.config["DATABASE"]) as connection:
+                        connection.execute(
+                            """
+                            INSERT INTO users
+                                (name, email, role, password_hash, created_at)
+                            VALUES (?, ?, 'student', ?, ?)
+                            """,
+                            (name, email, generate_password_hash(password), now),
+                        )
+                except sqlite3.IntegrityError:
+                    with get_connection(app.config["DATABASE"]) as connection:
+                        existing_user = connection.execute(
+                            "SELECT 1 FROM users WHERE email = ?",
+                            (email,),
+                        ).fetchone()
+                    if existing_user is None:
+                        raise
+                    error = "An account with that email already exists."
+                    status_code = 409
+                else:
+                    flash("Student account created. Please log in.")
+                    return redirect(url_for("login"))
+
+        return (
+            render_template(
+                "register.html",
+                error=error,
+                name=name,
+                email=email,
+            ),
             status_code,
         )
 

@@ -11,11 +11,12 @@ from werkzeug.security import generate_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
 SCHEMA_PATH = BASE_DIR / "schema.sql"
+ADMIN_IDENTIFIER = "admin@123"
 
 DEMO_USERS = (
     ("Asha Student", "student@campus.edu", "student", "Student123!"),
-    ("Ravi Staff", "staff@campus.edu", "staff", "Staff123!"),
-    ("Campus Admin", "admin@campus.edu", "admin", "Admin123!"),
+    ("Ravi Student", "student2@campus.edu", "student", "Student123!"),
+    ("Campus Admin", ADMIN_IDENTIFIER, "admin", "Admin123"),
 )
 
 DEMO_RESOURCES = (
@@ -40,7 +41,7 @@ def get_connection(database_path: str) -> Generator[sqlite3.Connection, None, No
         connection.close()
 
 
-def init_db(database_path: str) -> None:
+def init_db(database_path: str, seed_demo_users: bool = True) -> None:
     """Create the database and seed demo records without duplicating them."""
     database = Path(database_path)
     database.parent.mkdir(parents=True, exist_ok=True)
@@ -93,16 +94,30 @@ def init_db(database_path: str) -> None:
                 """
             )
 
+        connection.execute(
+            "UPDATE users SET role = 'student' WHERE role = 'staff'"
+        )
+        connection.execute(
+            """
+            UPDATE users
+            SET role = 'student'
+            WHERE role = 'admin' AND email != ?
+            """,
+            (ADMIN_IDENTIFIER,),
+        )
+
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-        for name, email, role, password in DEMO_USERS:
-            connection.execute(
-                """
-                INSERT OR IGNORE INTO users (name, email, role, password_hash, created_at)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (name, email, role, generate_password_hash(password), now),
-            )
+        if seed_demo_users:
+            for name, email, role, password in DEMO_USERS:
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO users
+                        (name, email, role, password_hash, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (name, email, role, generate_password_hash(password), now),
+                )
 
         for name, resource_type, location, capacity in DEMO_RESOURCES:
             connection.execute(

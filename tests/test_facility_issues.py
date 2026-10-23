@@ -121,7 +121,7 @@ class FacilityIssueAndAdminTests(unittest.TestCase):
     def test_user_cannot_view_another_users_issue_report(self):
         self.submit_issue(title="Private student report")
         self.client = self.app.test_client()
-        self.login_as("staff@campus.edu", "Staff123!")
+        self.login_as("student2@campus.edu", "Student123!")
 
         response = self.client.get("/dashboard")
         self.assertEqual(response.status_code, 200)
@@ -131,18 +131,18 @@ class FacilityIssueAndAdminTests(unittest.TestCase):
         self.submit_issue(title="Campus plumbing issue", category="plumbing")
         issue_id = self.issue_rows()[0]["id"]
         self.client = self.app.test_client()
-        self.login_as("staff@campus.edu", "Staff123!")
+        self.login_as("student2@campus.edu", "Student123!")
         self.submit_issue(title="Staff network issue", category="network")
 
         self.client = self.app.test_client()
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
 
         response = self.client.get("/admin")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Campus plumbing issue", response.data)
         self.assertIn(b"Staff network issue", response.data)
         self.assertIn(b"Asha Student", response.data)
-        self.assertIn(b"Ravi Staff", response.data)
+        self.assertIn(b"Ravi Student", response.data)
         response = self.client.post(
             f"/issues/{issue_id}/status",
             data={
@@ -200,7 +200,7 @@ class FacilityIssueAndAdminTests(unittest.TestCase):
         self.assertEqual(self.issue_rows()[0]["status"], "open")
 
         self.client = self.app.test_client()
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         response = self.client.post(
             f"/issues/{issue_id}/status",
             data={"csrf_token": self.csrf_token("/admin"), "status": "deleted"},
@@ -212,7 +212,7 @@ class FacilityIssueAndAdminTests(unittest.TestCase):
         self.submit_issue()
         issue_id = self.issue_rows()[0]["id"]
         self.client = self.app.test_client()
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         response = self.client.post(
             f"/issues/{issue_id}/status",
             data={"status": "resolved"},
@@ -229,7 +229,21 @@ class FacilityIssueAndAdminTests(unittest.TestCase):
             ).fetchone()["id"]
 
         self.client = self.app.test_client()
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
+        admin_dashboard = self.client.get("/admin")
+        self.assertIn(b"Pending booking requests", admin_dashboard.data)
+        self.assertIn(b"Approval workflow booking", admin_dashboard.data)
+        self.assertIn(b"Lecture Hall 1", admin_dashboard.data)
+        self.assertIn(b"Approve</button>", admin_dashboard.data)
+        self.assertIn(b"Reject</button>", admin_dashboard.data)
+        self.assertIn(
+            f'action="/admin/bookings/{booking_id}/approve"'.encode(),
+            admin_dashboard.data,
+        )
+        self.assertIn(
+            f'action="/admin/bookings/{booking_id}/reject"'.encode(),
+            admin_dashboard.data,
+        )
         response = self.client.post(
             f"/admin/bookings/{booking_id}/approve",
             data={"csrf_token": self.csrf_token("/admin")},
@@ -253,7 +267,7 @@ class FacilityIssueAndAdminTests(unittest.TestCase):
             ).fetchone()["id"]
 
         self.client = self.app.test_client()
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         response = self.client.post(
             f"/admin/bookings/{booking_id}/reject",
             data={"csrf_token": self.csrf_token("/admin")},
@@ -309,7 +323,7 @@ class FacilityIssueAndAdminTests(unittest.TestCase):
                 "SELECT id FROM bookings"
             ).fetchone()["id"]
         self.client = self.app.test_client()
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
 
         for action in ("approve", "reject"):
             with self.subTest(action=action):
@@ -327,7 +341,7 @@ class FacilityIssueAndAdminTests(unittest.TestCase):
                 "SELECT id FROM bookings WHERE purpose = 'Pending booking'"
             ).fetchone()["id"]
             staff_id = connection.execute(
-                "SELECT id FROM users WHERE email = 'staff@campus.edu'"
+                "SELECT id FROM users WHERE email = 'student2@campus.edu'"
             ).fetchone()["id"]
             connection.execute(
                 """
@@ -341,7 +355,7 @@ class FacilityIssueAndAdminTests(unittest.TestCase):
             )
 
         self.client = self.app.test_client()
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         response = self.client.post(
             f"/admin/bookings/{pending_id}/approve",
             data={"csrf_token": self.csrf_token("/admin")},

@@ -37,6 +37,57 @@
             {% endwith %}
 
             {% if is_admin %}
+                <section class="booking-section" aria-labelledby="pending-bookings-title">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">ADMIN ACTIONS</p>
+                            <h2 id="pending-bookings-title">Pending booking requests</h2>
+                        </div>
+                    </div>
+
+                    {% if pending_bookings %}
+                        <div class="table-wrap">
+                            <table class="booking-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Requester</th>
+                                        <th scope="col">Facility</th>
+                                        <th scope="col">Date</th>
+                                        <th scope="col">Time</th>
+                                        <th scope="col">Purpose</th>
+                                        <th scope="col">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in pending_bookings %}
+                                        <tr>
+                                            <td data-label="Requester">{{ booking["requester_name"] }}</td>
+                                            <td data-label="Facility">{{ booking["resource_name"] }}</td>
+                                            <td data-label="Date">{{ booking["booking_date"] }}</td>
+                                            <td data-label="Time">{{ booking["start_time"] }}–{{ booking["end_time"] }}</td>
+                                            <td data-label="Purpose">{{ booking["purpose"] }}</td>
+                                            <td data-label="Actions">
+                                                <div class="action-group">
+                                                    <form method="post" action="{{ url_for('approve_booking', booking_id=booking['id']) }}">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <button class="primary-button booking-action-button" type="submit">Approve</button>
+                                                    </form>
+                                                    <form method="post" action="{{ url_for('reject_booking', booking_id=booking['id']) }}">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <button class="secondary-button booking-action-button" type="submit">Reject</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-state">There are no pending booking requests.</div>
+                    {% endif %}
+                </section>
+
                 <section class="booking-section" aria-labelledby="analytics-title">
                     <div class="section-heading">
                         <div>
@@ -252,59 +303,6 @@
                     <div class="empty-state">You have no bookings yet. Request a facility above to get started.</div>
                 {% endif %}
             </section>
-
-            {% if is_admin %}
-                <section class="booking-section" aria-labelledby="pending-bookings-title">
-                    <div class="section-heading">
-                        <div>
-                            <p class="eyebrow">ADMIN ACTIONS</p>
-                            <h2 id="pending-bookings-title">Pending booking requests</h2>
-                        </div>
-                    </div>
-
-                    {% if pending_bookings %}
-                        <div class="table-wrap">
-                            <table class="booking-table">
-                                <thead>
-                                    <tr>
-                                        <th scope="col">Requester</th>
-                                        <th scope="col">Facility</th>
-                                        <th scope="col">Date</th>
-                                        <th scope="col">Time</th>
-                                        <th scope="col">Purpose</th>
-                                        <th scope="col">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for booking in pending_bookings %}
-                                        <tr>
-                                            <td data-label="Requester">{{ booking["requester_name"] }}</td>
-                                            <td data-label="Facility">{{ booking["resource_name"] }}</td>
-                                            <td data-label="Date">{{ booking["booking_date"] }}</td>
-                                            <td data-label="Time">{{ booking["start_time"] }}–{{ booking["end_time"] }}</td>
-                                            <td data-label="Purpose">{{ booking["purpose"] }}</td>
-                                            <td data-label="Actions">
-                                                <div class="action-group">
-                                                    <form method="post" action="{{ url_for('approve_booking', booking_id=booking['id']) }}">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                        <button class="text-button" type="submit">Approve</button>
-                                                    </form>
-                                                    <form method="post" action="{{ url_for('reject_booking', booking_id=booking['id']) }}">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                        <button class="text-button" type="submit">Reject</button>
-                                                    </form>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="empty-state">There are no pending booking requests.</div>
-                    {% endif %}
-                </section>
-            {% endif %}
 
             <section class="booking-section" aria-labelledby="report-issue-title">
                 <div class="section-heading">

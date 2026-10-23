@@ -114,7 +114,7 @@ class AdminAnalyticsTests(unittest.TestCase):
                 "SELECT id FROM users WHERE email = 'student@campus.edu'"
             ).fetchone()["id"]
             staff_id = connection.execute(
-                "SELECT id FROM users WHERE email = 'staff@campus.edu'"
+                "SELECT id FROM users WHERE email = 'student2@campus.edu'"
             ).fetchone()["id"]
             resource_ids = {
                 row["name"]: row["id"]
@@ -125,7 +125,7 @@ class AdminAnalyticsTests(unittest.TestCase):
         return student_id, staff_id, resource_ids
 
     def test_admin_can_access_analytics_and_dashboard_is_not_shown_to_others(self):
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         admin_response = self.client.get("/admin")
         self.assertEqual(admin_response.status_code, 200)
         self.assertIn(b"Operations analytics", admin_response.data)
@@ -139,7 +139,7 @@ class AdminAnalyticsTests(unittest.TestCase):
         self.assertNotIn(b"Operations analytics", dashboard.data)
 
     def test_empty_database_metrics_render_zero_counts_and_empty_states(self):
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         response = self.client.get("/admin")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"<strong>0</strong>", response.data)
@@ -164,7 +164,7 @@ class AdminAnalyticsTests(unittest.TestCase):
         self.insert_issue(student_id, "cleaning", "in_progress", f"{selected_date}T11:00:00+05:30")
         self.insert_issue(staff_id, "network", "open", f"{other_date}T09:00:00+05:30")
 
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         response = self.client.get("/admin")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"<strong>5</strong>", response.data)
@@ -219,7 +219,7 @@ class AdminAnalyticsTests(unittest.TestCase):
                 "2099-02-10",
             )
 
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         response = self.client.get("/admin")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
@@ -235,7 +235,7 @@ class AdminAnalyticsTests(unittest.TestCase):
         self.assertEqual(len(self.facility_rankings(response)), 5)
 
     def test_valid_iso_analytics_date_is_accepted(self):
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         response = self.client.get(
             "/admin",
             query_string={"analytics_date": "2099-02-10"},
@@ -243,7 +243,7 @@ class AdminAnalyticsTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_invalid_analytics_dates_are_rejected(self):
-        self.login_as("admin@campus.edu", "Admin123!")
+        self.login_as("admin@123", "Admin123")
         for invalid_date in (
             "not-a-date",
             "2026-02-30",
