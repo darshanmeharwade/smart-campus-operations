@@ -84,6 +84,7 @@ Copy `.env.example` as a reference for environment variables. The application re
 - `APP_ENV`: set to `production` when hosting. Production startup fails if `SECRET_KEY` is missing.
 - `SECRET_KEY`: Flask signing key. Generate a long random value and configure it in the hosting platform's secret/environment settings; do not commit it.
 - `DATABASE_PATH`: SQLite database file path (defaults to `instance/campus.db`).
+- On Vercel (`VERCEL=1`), if `DATABASE_PATH` is unset, the app uses `/tmp/campus.db` so SQLite initialization does not write under the read-only deployment directory.
 - `SESSION_COOKIE_SECURE`: optional local HTTPS setting. Production always enables secure session cookies; local HTTP defaults to insecure cookies for development.
 - `DEMO_USERS_ENABLED`: local-only option to control demo-user seeding. Production always disables demo-user creation and blocks the built-in demo logins.
 - `HOST`, `PORT`, `FLASK_DEBUG`: local server options.
@@ -104,6 +105,8 @@ Attach a persistent Render disk mounted at `/var/data`; SQLite writes must stay 
 Production does not seed demo users. Provision a real administrator account through the private `provision_admin.py` command before relying on admin workflows. Public student sign-up is available, but it cannot create staff or administrator accounts. Never copy a development database to a public deployment because it may contain other local/test data. Demo resource records are still inserted idempotently to make the facility catalog available on a fresh database.
 
 Render's local filesystem is ephemeral unless a persistent disk is attached. This setup is suitable for a small single-instance MVP; SQLite on a single persistent disk is not intended for multi-instance scaling or high write concurrency.
+
+On Vercel, the default SQLite path is `/tmp/campus.db` to avoid writing into the read-only application directory. This is only temporary demo storage: data may disappear between invocations, and separate serverless instances may have separate database files. Do not use this mode for persistent user or booking data.
 
 ## PythonAnywhere Free deployment
 

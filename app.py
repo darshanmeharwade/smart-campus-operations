@@ -22,7 +22,13 @@ from flask import (
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from db import ADMIN_IDENTIFIER, DEMO_USERS, get_connection, init_db
+from db import (
+    ADMIN_IDENTIFIER,
+    DEMO_USERS,
+    default_database_path,
+    get_connection,
+    init_db,
+)
 from issue_triage import recommend_issue_triage
 
 
@@ -44,9 +50,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     """Create and configure the Flask application."""
     app = Flask(__name__)
     app.config["APP_ENV"] = os.environ.get("APP_ENV", "development").strip().lower()
-    app.config["DATABASE"] = os.environ.get(
-        "DATABASE_PATH", str(BASE_DIR / "instance" / "campus.db")
-    )
+    app.config["DATABASE"] = os.environ.get("DATABASE_PATH") or default_database_path()
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)

@@ -1,5 +1,6 @@
 """SQLite connection, schema initialization, and first-run demo data."""
 
+import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -26,6 +27,13 @@ DEMO_RESOURCES = (
     ("Projector Kit A", "equipment", "Equipment Desk, Main Library", 1),
     ("Portable PA System", "equipment", "Equipment Desk, Main Library", 1),
 )
+
+
+def default_database_path() -> str:
+    """Return writable demo storage on Vercel, keeping the local default."""
+    if os.environ.get("VERCEL") == "1":
+        return "/tmp/campus.db"
+    return str(BASE_DIR / "instance" / "campus.db")
 
 
 @contextmanager

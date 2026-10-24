@@ -9,7 +9,7 @@ from pathlib import Path
 
 from werkzeug.security import generate_password_hash
 
-from db import ADMIN_IDENTIFIER, BASE_DIR, get_connection
+from db import ADMIN_IDENTIFIER, default_database_path, get_connection
 
 
 MINIMUM_PASSWORD_LENGTH = 12
@@ -102,11 +102,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--database",
-        default=os.environ.get(
-            "DATABASE_PATH",
-            str(BASE_DIR / "instance" / "campus.db"),
-        ),
-        help="SQLite database path (defaults to DATABASE_PATH or instance/campus.db)",
+        default=os.environ.get("DATABASE_PATH") or default_database_path(),
+        help="SQLite database path (defaults to DATABASE_PATH or the platform default)",
     )
     args = parser.parse_args(argv)
 
